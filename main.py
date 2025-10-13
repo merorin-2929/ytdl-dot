@@ -243,7 +243,7 @@ def main(page:Page):
     url_input = TextField(label="URL", hint_text="URLを入力", expand=True)
     fetch_button = TextButton(text="取得",icon=Icons.SEARCH,on_click=on_fetch)
 
-    videos_empty = Container(content=Row([Text("動画がありません",size=16,weight=FontWeight.BOLD)],alignment=MainAxisAlignment.CENTER),padding=padding.all(12))
+    videos_empty = Container(content=Row([Text("動画がありません\nURLを入力し「取得」を押してください",size=16,text_align=TextAlign.CENTER)],alignment=MainAxisAlignment.CENTER),padding=padding.all(12))
     videos_load = Container(content=Row([ProgressRing(width=24,height=24,value=None,stroke_cap=StrokeCap.ROUND),Text("読み込み中...",size=16,weight=FontWeight.BOLD)],alignment=MainAxisAlignment.CENTER),padding=padding.all(12))
     videos_list = Column(spacing=10,width=float("inf"),expand=True,scroll=ScrollMode.ADAPTIVE,controls=[videos_empty])
 
@@ -283,9 +283,9 @@ def main(page:Page):
     )
 
     tabs = Tabs(tabs=[
-        Tab(text="動画リスト",icon=Icons.LIST,content=videos_list),
-        Tab(text="ダウンロード設定",icon=Icons.SETTINGS,content=Container(content=setting_tab,padding=padding.all(12))),
-        Tab(text="ステータス",icon=Icons.INFO,content=Container(content=log_tab,padding=padding.all(12)))
+        Tab(text="動画リスト",content=videos_list),
+        Tab(text="ダウンロード設定",content=Container(content=setting_tab,padding=padding.all(12))),
+        Tab(text="ステータス",content=Container(content=log_tab,padding=padding.all(12)))
     ],height=500,expand=1,selected_index=0,animation_duration=300)
 
     # 最終
