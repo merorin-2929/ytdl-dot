@@ -1,4 +1,8 @@
 # ytdl-.(dot)
+
+## Sorry!!!
+Sorry! This software only supports Japanese!
+
 ## About
 シンプルなyt-dlp GUIソフトウェアです。  
 開発中で、実行可能なファイルの配布はしていません。
