@@ -1,3 +1,5 @@
+from textwrap import wrap
+from turtle import bgcolor
 from flet import *
 import subprocess
 import json
@@ -28,7 +30,7 @@ def resolve_thumbnail(vid:str) -> str | None:
 
 # 情報取得
 def get_video_info(url: str):
-    cmd = ["yt-dlp","-J","--flat-playlist",url]
+    cmd = ["yt-dlp","-J","--flat-playlist","--add-header","Accept-Language: ja-JP,ja;q=0.9,en-US;q=0.8,en;q=0.7",url]
     try:
         result = subprocess.run(cmd,capture_output=True,text=True,check=True)
         data = json.loads(result.stdout)
@@ -87,6 +89,7 @@ def main(page:Page):
     def download_video(v: dict):
         url = v.get("url")
         title = v.get("title")
+        channel = v.get("channel")
         print("Download : ",title)
         cmd = ["yt-dlp", "--newline", "--no-warnings"]
         if use_cookies.value and from_cookies.value != "none":
@@ -109,12 +112,19 @@ def main(page:Page):
         cmd.append(url)
         try:
             download_progress.value = None
+            downloading_title.value = title
+            downloading_channel.value = channel
             toggle_download_button(True)
-            subprocess.run(cmd,check=True)
+            p = subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+            for line in p.stdout:
+                log_text.controls.append(Text(line))
+                log_text.update()
         except subprocess.CalledProcessError:
             pass
         finally:
             download_progress.value = 1
+            downloading_title.value = ""
+            downloading_channel.value = ""
             toggle_download_button(False)
 
     # 情報取得
@@ -261,6 +271,11 @@ def main(page:Page):
     audio_quality_list = [DropdownOption(key="auto",text="自動"),DropdownOption(key="320k",text="320kbps"),DropdownOption(key="256k",text="256kbps"),DropdownOption(key="192k",text="192kbps"),DropdownOption(key="128k",text="128kbps")]
     quality_dropdown = Dropdown(label="画質",options=video_quality_list,value=video_quality_list[0].key,expand=1)
 
+    # ステータス画面 - 要素
+    downloading_title = TextField(label="ダウンロード中の動画",expand=1)
+    downloading_channel = TextField(label="チャンネル",expand=1)
+    log_text = Column(spacing=1,expand=1,scroll=ScrollMode.ADAPTIVE,height=300,width=float("inf"))
+    
     download_button = FloatingActionButton(text="ダウンロード",icon=Icons.DOWNLOAD,on_click=on_download,bgcolor=Colors.RED_100)
 
     download_progress = ProgressBar(value=0,border_radius=border_radius.all(8))
@@ -277,7 +292,8 @@ def main(page:Page):
 
     log_tab = Column(
         controls=[
-            Text("後でログ画面が作られます。")
+            Row([downloading_title,downloading_channel]),
+            log_text
         ],
         width=float("inf")
     )
