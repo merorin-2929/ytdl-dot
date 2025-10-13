@@ -1,0 +1,12 @@
+[project]
+name = "ytdl-dot"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "flet[all]>=0.28.3",
+    "pillow>=11.3.0",
+    "pyperclip>=1.11.0",
+    "win11toast>=0.36.2",
+]
