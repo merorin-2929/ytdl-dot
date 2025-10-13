@@ -67,6 +67,7 @@ def main(page:Page):
     page.window.height = 700
     page.window.width = 1200
     page.window.center()
+    page.on_close = lambda e: save_current_settings()
 
     # 諸々の変数
     current_url = ""
@@ -146,6 +147,8 @@ def main(page:Page):
             downloading_title.value = title
             downloading_channel.value = channel
             tabs.selected_index = 2
+            log_text.controls.append(Text(f"▶️ ダウンロード開始 : {title}",weight=FontWeight.BOLD,color=Colors.BLUE))
+            log_text.scroll_to(-1)
             toggle_download_button(True)
             p = subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,bufsize=1,universal_newlines=True)
             while True:
@@ -166,6 +169,9 @@ def main(page:Page):
                         log_text.scroll_to(-1)
                         log_text.update()
             p.wait()
+            log_text.controls.append(Text(f"✅ ダウンロード完了 : {title}",weight=FontWeight.BOLD,color=Colors.GREEN))
+            log_text.scroll_to(-1)
+            log_text.update()
         except Exception as e:
             log_text.controls.append(Text(f"[Error] {str(e)}",color=Colors.RED,weight=FontWeight.BOLD))
             log_text.scroll_to(-1)
@@ -468,6 +474,8 @@ def main(page:Page):
         Tab(text="ログ",content=Container(content=log_tab,padding=padding.all(12),expand=1))
     ],height=500,expand=1,selected_index=0,animation_duration=300)
 
+    save_current_settings()
+    
     # 最終
     page.floating_action_button = download_button
     page.add(
