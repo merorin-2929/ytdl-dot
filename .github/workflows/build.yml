@@ -40,4 +40,4 @@ jobs:
               env:
                 GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
-                gh release create "${{ env.VERSION }}" dist/*.zip
+                gh release create "${{ env.VERSION }}" dist/*.zip --prerelease=$([[ "${{ env.VERSION }}" == dev-* ]] && echo true || echo false) --generate-notes

@@ -73,6 +73,36 @@ def main(page:Page):
     selected_videos = []
     all_videos = []
     download_buttons = []
+    settings_path = os.path.abspath("./config.json")
+
+    def load_settings():
+        """設定をJSONから読み込む"""
+        if os.path.exists(settings_path):
+            try:
+                with open(settings_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception as e:
+                print("設定の読み込みに失敗:", e)
+                return {}
+        return {}
+    
+    def save_settings(data: dict):
+        """設定をJSONに保存する"""
+        try:
+            with open(settings_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print("設定の保存に失敗:", e)
+    
+    def save_current_settings():
+        data = {
+            "output_path": output_path_input.value,
+            "format": format_dropdown.value,
+            "quality": quality_dropdown.value,
+            "use_cookies": use_cookies.value,
+            "from_cookies": from_cookies.value,
+        }
+        save_settings(data)
 
     # ダウンロードボタンのトグル
     def toggle_download_button(state:bool):
@@ -115,6 +145,7 @@ def main(page:Page):
             download_progress.value = None
             downloading_title.value = title
             downloading_channel.value = channel
+            tabs.selected_index = 2
             toggle_download_button(True)
             p = subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,bufsize=1,universal_newlines=True)
             while True:
@@ -246,57 +277,172 @@ def main(page:Page):
     
     def change_format(e):
         if format_dropdown.value == "mp4" or format_dropdown.value == "mkv":
+            quality_dropdown.disabled = False
             quality_dropdown.options = video_quality_list
             quality_dropdown.value = video_quality_list[0].key
             quality_dropdown.update()
         elif format_dropdown.value == "mp3":
+            quality_dropdown.disabled = False
             quality_dropdown.options = audio_quality_list
             quality_dropdown.value = audio_quality_list[0].key
             quality_dropdown.update()
         else:
+            quality_dropdown.disabled = True
             quality_dropdown.options = []
-            quality_dropdown.value = None
+            quality_dropdown.value = ""
             quality_dropdown.update()
     
     def pick_output_dir(e:FilePickerResultEvent):
         before_path = output_path_input.value
         output_path_input.value = os.path.abspath(e.path) if e.path else before_path
+        save_current_settings()
         page.update()
     
     pick_output_dialog = FilePicker(on_result=pick_output_dir)
 
     page.overlay.append(pick_output_dialog)
+
+    settings = load_settings()
+
+    output_dir = settings.get("output_path", default_download_dir)
+    fmt = settings.get("format", "mp4")
+    quality = settings.get("quality", "auto")
+    use_cookie = settings.get("use_cookies", False)
+    from_cookie = settings.get("from_cookies", "none")
     
     # UI要素定義
     url_input = TextField(label="URL", hint_text="URLを入力", expand=True)
-    fetch_button = TextButton(text="取得",icon=Icons.SEARCH,on_click=on_fetch)
+    fetch_button = TextButton(text="取得", icon=Icons.SEARCH, on_click=on_fetch)
 
-    videos_empty = Container(content=Row([Text("動画がありません\nURLを入力し「取得」を押してください",size=16,text_align=TextAlign.CENTER)],alignment=MainAxisAlignment.CENTER),padding=padding.all(12))
-    videos_load = Container(content=Row([ProgressRing(width=24,height=24,value=None,stroke_cap=StrokeCap.ROUND),Text("読み込み中...",size=16,weight=FontWeight.BOLD)],alignment=MainAxisAlignment.CENTER),padding=padding.all(12))
-    videos_list = Column(spacing=10,width=float("inf"),expand=True,scroll=ScrollMode.ADAPTIVE,controls=[videos_empty])
+    videos_empty = Container(
+        content=Row(
+            [Text("動画がありません\nURLを入力し「取得」を押してください", size=16, text_align=TextAlign.CENTER)],
+            alignment=MainAxisAlignment.CENTER
+        ),
+        padding=padding.all(12)
+    )
+    videos_load = Container(
+        content=Row(
+            [
+                ProgressRing(width=24, height=24, value=None, stroke_cap=StrokeCap.ROUND),
+                Text("読み込み中...", size=16, weight=FontWeight.BOLD)
+            ],
+            alignment=MainAxisAlignment.CENTER
+        ),
+        padding=padding.all(12)
+    )
+    videos_list = Column(
+        spacing=10,
+        width=float("inf"),
+        expand=True,
+        scroll=ScrollMode.ADAPTIVE,
+        controls=[videos_empty]
+    )
 
     # 保存先
-    output_path_input = TextField(label="保存先",value=default_download_dir,expand=1)
-    output_path_button = TextButton(text="選択",icon=Icons.FOLDER,on_click=lambda _:pick_output_dialog.get_directory_path(dialog_title="保存先を選択",initial_directory=output_path_input.value))
+    output_path_input = TextField(
+        label="保存先",
+        value=output_dir,
+        expand=1,
+        on_change=lambda e: save_current_settings()
+    )
+    output_path_button = TextButton(
+        text="選択",
+        icon=Icons.FOLDER,
+        on_click=lambda _: pick_output_dialog.get_directory_path(
+            dialog_title="保存先を選択",
+            initial_directory=output_path_input.value
+        )
+    )
 
     # cookie
-    use_cookies = Switch(label="cookieを使用する",on_change=on_cookie)
-    from_cookies = Dropdown(label="ブラウザを選択",options=[DropdownOption(key="none",text="None"),DropdownOption(key="chrome",text="Chrome"),DropdownOption(key="firefox",text="Firefox"),DropdownOption(key="brave",text="Brave")],disabled=True,expand=1)
-    
+    use_cookies = Switch(
+        label="cookieを使用する",
+        value=use_cookie,
+        on_change=lambda e: [on_cookie(e), save_current_settings()]
+    )
+    from_cookies = Dropdown(
+        label="ブラウザを選択",
+        options=[
+            DropdownOption(key="none", text="None"),
+            DropdownOption(key="chrome", text="Chrome"),
+            DropdownOption(key="firefox", text="Firefox"),
+            DropdownOption(key="brave", text="Brave")
+        ],
+        value=from_cookie,
+        disabled=not use_cookie,
+        expand=1,
+        on_change=lambda e: save_current_settings()
+    )
+
     # フォーマット
-    format_dropdown = Dropdown(label="フォーマット",options=[DropdownOption(key="mp4",text="mp4"),DropdownOption(key="mkv",text="mkv"),DropdownOption(key="mp3",text="mp3"),DropdownOption(key="wav",text="wav")],value="mp4",expand=1,on_change=change_format)
-    video_quality_list = [DropdownOption(key="auto",text="自動"),DropdownOption(key="2160",text="4K"),DropdownOption(key="1440",text="2K"),DropdownOption(key="1080",text="1080p"),DropdownOption(key="720",text="720p")]
-    audio_quality_list = [DropdownOption(key="auto",text="自動"),DropdownOption(key="320k",text="320kbps"),DropdownOption(key="256k",text="256kbps"),DropdownOption(key="192k",text="192kbps"),DropdownOption(key="128k",text="128kbps")]
-    quality_dropdown = Dropdown(label="品質",options=video_quality_list,value=video_quality_list[0].key,expand=1)
+    format_dropdown = Dropdown(
+        label="フォーマット",
+        options=[
+            DropdownOption(key="mp4", text="mp4"),
+            DropdownOption(key="mkv", text="mkv"),
+            DropdownOption(key="mp3", text="mp3"),
+            DropdownOption(key="wav", text="wav")
+        ],
+        value=fmt,
+        expand=1,
+        on_change=lambda e: [change_format(e), save_current_settings()]
+    )
+
+    video_quality_list = [
+        DropdownOption(key="auto", text="自動"),
+        DropdownOption(key="2160", text="4K"),
+        DropdownOption(key="1440", text="2K"),
+        DropdownOption(key="1080", text="1080p"),
+        DropdownOption(key="720", text="720p")
+    ]
+    audio_quality_list = [
+        DropdownOption(key="auto", text="自動"),
+        DropdownOption(key="320k", text="320kbps"),
+        DropdownOption(key="256k", text="256kbps"),
+        DropdownOption(key="192k", text="192kbps"),
+        DropdownOption(key="128k", text="128kbps")
+    ]
+
+    if fmt in ["mp4", "mkv"]:
+        quality_dropdown = Dropdown(
+            label="品質",
+            options=video_quality_list,
+            value=quality,
+            expand=1,
+            on_change=lambda e: save_current_settings()
+        )
+    elif fmt == "mp3":
+        quality_dropdown = Dropdown(
+            label="品質",
+            options=audio_quality_list,
+            value=quality,
+            expand=1,
+            on_change=lambda e: save_current_settings()
+        )
+    else:  # wav
+        quality_dropdown = Dropdown(
+            label="品質",
+            options=[],
+            value=None,
+            disabled=True,
+            expand=1
+        )
 
     # ステータス画面 - 要素
-    downloading_title = TextField(label="ダウンロード中の動画",expand=1)
-    downloading_channel = TextField(label="チャンネル",expand=1)
-    log_text = Column(spacing=0,expand=1,scroll=ScrollMode.ADAPTIVE,width=float("inf"))
+    downloading_title = TextField(label="ダウンロード中の動画", expand=1)
+    downloading_channel = TextField(label="チャンネル", expand=1)
+    log_text = Column(spacing=0, expand=1, scroll=ScrollMode.ADAPTIVE, width=float("inf"))
     
-    download_button = FloatingActionButton(text="ダウンロード",icon=Icons.DOWNLOAD,on_click=on_download,bgcolor=Colors.RED_100)
+    download_button = FloatingActionButton(
+        text="ダウンロード",
+        icon=Icons.DOWNLOAD,
+        on_click=on_download,
+        bgcolor=Colors.RED_100
+    )
 
-    download_progress = ProgressBar(value=0,border_radius=border_radius.all(8))
+    download_progress = ProgressBar(value=0, border_radius=border_radius.all(8))
+
 
     # 設定タブ
     setting_tab = Column(
