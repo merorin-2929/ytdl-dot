@@ -58,6 +58,13 @@ def get_video_info(url: str):
 def main(page:Page):
     page.title = "ytdl."
     page.scroll = ScrollMode.ADAPTIVE
+    page.theme_mode = ThemeMode.LIGHT
+    page.theme = Theme(color_scheme=ColorScheme(primary=Colors.RED))
+
+    # ウィンドウ設定
+    page.window.height = 700
+    page.window.width = 1200
+    page.window.center()
 
     # 諸々の変数
     current_url = ""
@@ -81,14 +88,25 @@ def main(page:Page):
         url = v.get("url")
         title = v.get("title")
         print("Download : ",title)
-        cmd = [
-            "yt-dlp",
-            "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best",
-            "--merge-output-format", "mp4",
-            "-o", f"{os.path.abspath(output_path_input.value)}/%(title)s.%(ext)s",
-            "--no-playlist",
-            url
-        ]
+        cmd = ["yt-dlp", "--newline", "--no-warnings"]
+        if use_cookies.value and from_cookies.value != "none":
+            cmd.append(f"--cookies-from-browser {from_cookies.value}")
+        if format_dropdown.value == "mp4" or format_dropdown.value == "mkv":
+            if quality_dropdown.value == "auto":
+                cmd.extend(["-f","bestvideo[ext=mp4]+bestaudio[ext=m4a]/best","--merge-output-format",format_dropdown.value])
+            else:
+                cmd.extend(["-f",f"bestvideo[ext=mp4][height>={quality_dropdown.value}]+bestaudio[ext=m4a]/best","--merge-output-format",format_dropdown.value])
+        elif format_dropdown.value == "mp3":
+            cmd.extend(["-f","bestaudio/best","-x","--audio-format",format_dropdown.value])
+            if quality_dropdown.value != "auto":
+                cmd.extend(["--audio-quality",quality_dropdown.value])
+            else:
+                cmd.extend(["--audio-quality","0"])
+        else:
+            cmd.extend(["-f","bestaudio/best","-x","--audio-format",format_dropdown.value,"--audio-quality","0"])
+        
+        cmd.extend(["-o",f"{os.path.abspath(output_path_input.value)}/%(title)s.%(ext)s"])
+        cmd.append(url)
         try:
             download_progress.value = None
             toggle_download_button(True)
@@ -108,19 +126,23 @@ def main(page:Page):
         download_buttons.clear()
         fetch_button.icon = Icons.HOURGLASS_BOTTOM
         fetch_button.disabled = True
-        fetch_button.update()
         tabs.selected_index = 0
-        tabs.update()
+        videos_list.controls.append(videos_load)
+        page.update()
         if url_input.value:
             current_url = url_input.value
             print("Update CurrentURL : ",current_url)
             videos = get_video_info(url_input.value)
+            page.update()
             if not videos:
                 page.open(SnackBar(Text("情報の取得中にエラーが発生しました")))
                 fetch_button.icon = Icons.SEARCH
                 fetch_button.disabled = False
+                videos_list.controls.clear()
+                videos_list.controls.append(videos_empty)
                 page.update()
                 return
+            videos_list.controls.pop()
             for v in videos:
                 all_videos.append(v)
                 dl_button = TextButton(
@@ -153,18 +175,18 @@ def main(page:Page):
                         ]),padding=10
                     )
                 )
-                videos_list.scroll_to(-1)
                 videos_list.controls.append(video_card)
-                page.update()
         else:
             page.open(SnackBar(Text("URLを入力してください")))
             fetch_button.icon = Icons.SEARCH
             fetch_button.disabled = False
+            videos_list.controls.clear()
+            videos_list.controls.append(videos_empty)
             page.update()
             return
         fetch_button.icon = Icons.SEARCH
         fetch_button.disabled = False
-        fetch_button.update()
+        page.update()
 
     # 選択・全体ダウンロード
     def on_download(e):
@@ -194,6 +216,20 @@ def main(page:Page):
             from_cookies.disabled = True
             from_cookies.update()
     
+    def change_format(e):
+        if format_dropdown.value == "mp4" or format_dropdown.value == "mkv":
+            quality_dropdown.options = video_quality_list
+            quality_dropdown.value = video_quality_list[0].key
+            quality_dropdown.update()
+        elif format_dropdown.value == "mp3":
+            quality_dropdown.options = audio_quality_list
+            quality_dropdown.value = audio_quality_list[0].key
+            quality_dropdown.update()
+        else:
+            quality_dropdown.options = []
+            quality_dropdown.value = None
+            quality_dropdown.update()
+    
     def pick_output_dir(e:FilePickerResultEvent):
         before_path = output_path_input.value
         output_path_input.value = os.path.abspath(e.path) if e.path else before_path
@@ -207,7 +243,9 @@ def main(page:Page):
     url_input = TextField(label="URL", hint_text="URLを入力", expand=True)
     fetch_button = TextButton(text="取得",icon=Icons.SEARCH,on_click=on_fetch)
 
-    videos_list = Column(spacing=10,width=float("inf"),expand=True,scroll=ScrollMode.ADAPTIVE)
+    videos_empty = Container(content=Row([Text("動画がありません",size=16,weight=FontWeight.BOLD)],alignment=MainAxisAlignment.CENTER),padding=padding.all(12))
+    videos_load = Container(content=Row([ProgressRing(width=24,height=24,value=None,stroke_cap=StrokeCap.ROUND),Text("読み込み中...",size=16,weight=FontWeight.BOLD)],alignment=MainAxisAlignment.CENTER),padding=padding.all(12))
+    videos_list = Column(spacing=10,width=float("inf"),expand=True,scroll=ScrollMode.ADAPTIVE,controls=[videos_empty])
 
     # 保存先
     output_path_input = TextField(label="保存先",value=default_download_dir,expand=1)
@@ -217,7 +255,13 @@ def main(page:Page):
     use_cookies = Switch(label="cookieを使用する",on_change=on_cookie)
     from_cookies = Dropdown(label="ブラウザを選択",options=[DropdownOption(key="none",text="None"),DropdownOption(key="chrome",text="Chrome"),DropdownOption(key="firefox",text="Firefox"),DropdownOption(key="brave",text="Brave")],disabled=True,expand=1)
     
-    download_button = FloatingActionButton(text="ダウンロード",icon=Icons.DOWNLOAD,on_click=on_download)
+    # フォーマット
+    format_dropdown = Dropdown(label="フォーマット",options=[DropdownOption(key="mp4",text="mp4"),DropdownOption(key="mkv",text="mkv"),DropdownOption(key="mp3",text="mp3"),DropdownOption(key="wav",text="wav")],value="mp4",expand=1,on_change=change_format)
+    video_quality_list = [DropdownOption(key="auto",text="自動"),DropdownOption(key="2160",text="4K"),DropdownOption(key="1440",text="2K"),DropdownOption(key="1080",text="1080p"),DropdownOption(key="720",text="720p")]
+    audio_quality_list = [DropdownOption(key="auto",text="自動"),DropdownOption(key="320k",text="320kbps"),DropdownOption(key="256k",text="256kbps"),DropdownOption(key="192k",text="192kbps"),DropdownOption(key="128k",text="128kbps")]
+    quality_dropdown = Dropdown(label="画質",options=video_quality_list,value=video_quality_list[0].key,expand=1)
+
+    download_button = FloatingActionButton(text="ダウンロード",icon=Icons.DOWNLOAD,on_click=on_download,bgcolor=Colors.RED_100)
 
     download_progress = ProgressBar(value=0,border_radius=border_radius.all(8))
 
@@ -225,14 +269,23 @@ def main(page:Page):
     setting_tab = Column(
         controls=[
             Row([output_path_input,output_path_button]),
+            Row([format_dropdown,quality_dropdown]),
             Row([use_cookies,from_cookies])
+        ],
+        width=float("inf")
+    )
+
+    log_tab = Column(
+        controls=[
+            Text("後でログ画面が作られます。")
         ],
         width=float("inf")
     )
 
     tabs = Tabs(tabs=[
         Tab(text="動画リスト",icon=Icons.LIST,content=videos_list),
-        Tab(text="ダウンロード設定",icon=Icons.SETTINGS,content=Container(content=setting_tab,padding=padding.all(12)))
+        Tab(text="ダウンロード設定",icon=Icons.SETTINGS,content=Container(content=setting_tab,padding=padding.all(12))),
+        Tab(text="ステータス",icon=Icons.INFO,content=Container(content=log_tab,padding=padding.all(12)))
     ],height=500,expand=1,selected_index=0,animation_duration=300)
 
     # 最終

@@ -8,5 +8,4 @@ dependencies = [
     "flet[all]>=0.28.3",
     "pillow>=11.3.0",
     "pyperclip>=1.11.0",
-    "win11toast>=0.36.2",
 ]
