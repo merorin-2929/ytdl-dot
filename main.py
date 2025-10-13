@@ -91,7 +91,8 @@ def main(page:Page):
         title = v.get("title")
         channel = v.get("channel")
         print("Download : ",title)
-        cmd = ["yt-dlp", "--newline", "--no-warnings"]
+        progress_template = "Downloading: %(progress._percent_str)s"
+        cmd = ["yt-dlp", "--newline", "--no-warnings","--progress-template",progress_template]
         if use_cookies.value and from_cookies.value != "none":
             cmd.append(f"--cookies-from-browser {from_cookies.value}")
         if format_dropdown.value == "mp4" or format_dropdown.value == "mkv":
@@ -115,12 +116,29 @@ def main(page:Page):
             downloading_title.value = title
             downloading_channel.value = channel
             toggle_download_button(True)
-            p = subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
-            for line in p.stdout:
-                log_text.controls.append(Text(line))
-                log_text.update()
-        except subprocess.CalledProcessError:
-            pass
+            p = subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,bufsize=1,universal_newlines=True)
+            while True:
+                output = p.stdout.readline()
+                if output == "" and p.poll() is not None:
+                    break
+                if output:
+                    log_entry = output.strip()
+                    if log_entry.startswith("Downloading:") :
+                        try:
+                            progress = progress = output.split("Downloading: ")[1].strip()
+                            download_progress.value = float(progress.strip("%")) / 100
+                            download_progress.update()
+                        except ValueError:
+                            pass
+                    else:
+                        log_text.controls.append(Text(log_entry))
+                        log_text.scroll_to(-1)
+                        log_text.update()
+            p.wait()
+        except Exception as e:
+            log_text.controls.append(Text(f"[Error] {str(e)}",color=Colors.RED,weight=FontWeight.BOLD))
+            log_text.scroll_to(-1)
+            log_text.update()
         finally:
             download_progress.value = 1
             downloading_title.value = ""
@@ -269,12 +287,12 @@ def main(page:Page):
     format_dropdown = Dropdown(label="フォーマット",options=[DropdownOption(key="mp4",text="mp4"),DropdownOption(key="mkv",text="mkv"),DropdownOption(key="mp3",text="mp3"),DropdownOption(key="wav",text="wav")],value="mp4",expand=1,on_change=change_format)
     video_quality_list = [DropdownOption(key="auto",text="自動"),DropdownOption(key="2160",text="4K"),DropdownOption(key="1440",text="2K"),DropdownOption(key="1080",text="1080p"),DropdownOption(key="720",text="720p")]
     audio_quality_list = [DropdownOption(key="auto",text="自動"),DropdownOption(key="320k",text="320kbps"),DropdownOption(key="256k",text="256kbps"),DropdownOption(key="192k",text="192kbps"),DropdownOption(key="128k",text="128kbps")]
-    quality_dropdown = Dropdown(label="画質",options=video_quality_list,value=video_quality_list[0].key,expand=1)
+    quality_dropdown = Dropdown(label="品質",options=video_quality_list,value=video_quality_list[0].key,expand=1)
 
     # ステータス画面 - 要素
     downloading_title = TextField(label="ダウンロード中の動画",expand=1)
     downloading_channel = TextField(label="チャンネル",expand=1)
-    log_text = Column(spacing=1,expand=1,scroll=ScrollMode.ADAPTIVE,height=300,width=float("inf"))
+    log_text = Column(spacing=0,expand=1,scroll=ScrollMode.ADAPTIVE,width=float("inf"))
     
     download_button = FloatingActionButton(text="ダウンロード",icon=Icons.DOWNLOAD,on_click=on_download,bgcolor=Colors.RED_100)
 
@@ -301,7 +319,7 @@ def main(page:Page):
     tabs = Tabs(tabs=[
         Tab(text="動画リスト",content=videos_list),
         Tab(text="ダウンロード設定",content=Container(content=setting_tab,padding=padding.all(12))),
-        Tab(text="ステータス",content=Container(content=log_tab,padding=padding.all(12)))
+        Tab(text="ログ",content=Container(content=log_tab,padding=padding.all(12),expand=1))
     ],height=500,expand=1,selected_index=0,animation_duration=300)
 
     # 最終
