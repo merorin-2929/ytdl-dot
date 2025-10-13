@@ -1,0 +1,60 @@
+name: 🛠️Build
+
+on:
+    push:
+        tags:
+            - "v*"
+            - "dev-*"
+
+permissions:
+    contents: write
+jobs:
+    build:
+        runs-on: windows-latest
+        env:
+            VERSION: ${{ github.ref_name }}
+        steps:
+            - name: 📥 Checkout code
+              uses: actions/checkout@v4
+            - name: 🐍 Setup Python
+              uses: actions/setup-python@v6
+              with:
+                python-version: "3.13"
+            - name: 📦 Install dependencies
+              run: |
+                pip install -r requirements.txt
+            - name: 🚀 Build Bootloader
+              run: |
+                git clone https://github.com/pyinstaller/pyinstaller.git
+                cd pyinstaller/bootloader
+                python ./waf distclean all
+                cd ..
+                pip install -e .
+            - name: 🔨 Build EXE
+              run: |
+                flet pack .\main.py --name ytdl-dot --onedir --product-name ytdl-dot --copyright merorin -y
+            - name: 🗜️ Create ZIP
+              run: |
+                Compress-Archive -Path dist/ytdl-dot/* -DestinationPath dist/ytdl-dot-${{ env.VERSION }}-windows.zip -Force
+            - name: ⬆️ Upload Artifact
+              uses: actions/upload-artifact@v4
+              with:
+                name: windows-build
+                path: |
+                  dist/ytdl-dot-${{ env.VERSION }}-windows.zip
+    create-release:
+        needs: [build]
+        runs-on: ubuntu-latest
+        env:
+            VERSION: ${{ github.ref_name }}
+        steps:
+            - name: ⬇️ Download Artifact
+              uses: actions/download-artifact@v4
+              with:
+                name: windows-build
+                path: ./artifacts
+            - name: 🏷️ Create Release
+              run: |
+                gh release create ${{ env.VERSION }} ./artifacts/*.zip
+              env:
+                GITHUB_TOKRN: ${{secrets.GITHUB_TOKEN}}
