@@ -36,25 +36,8 @@ jobs:
             - name: 🗜️ Create ZIP
               run: |
                 Compress-Archive -Path dist/ytdl-dot/* -DestinationPath dist/ytdl-dot-${{ env.VERSION }}-windows.zip -Force
-            - name: ⬆️ Upload Artifact
-              uses: actions/upload-artifact@v4
-              with:
-                name: windows-build
-                path: |
-                  dist/ytdl-dot-${{ env.VERSION }}-windows.zip
-    create-release:
-        needs: [build]
-        runs-on: ubuntu-latest
-        env:
-            VERSION: ${{ github.ref_name }}
-        steps:
-            - name: ⬇️ Download Artifact
-              uses: actions/download-artifact@v4
-              with:
-                name: windows-build
-                path: ./artifacts
             - name: 🏷️ Create Release
-              run: |
-                gh release create ${{ env.VERSION }} ./artifacts/*.zip
               env:
-                GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
+                GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                gh release create "${{ env.VERSION }}" dist/*.zip
