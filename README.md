@@ -24,7 +24,30 @@ Sorry! This software only supports Japanese!
 - **Music Mode**  
     Music向けに最適化されたメタデータパースをするモードの実装
 
-## 依存関係
+## 動作環境及び必須パッケージ
 
-- flet
+| OS | バージョン | python | pyinstaller |
+| --- | --- | --- | --- |
+| Windows 11 | 24H2 | OK | OK(配布中) |
+| macOS | Sonoma | OK | NG |
+| Ubuntu | 24.04 LTS | OK | OK |
 
+開発環境は主にWindowsです。  
+動作検証はWindows及びmacOSで都度行っています。  
+Linuxに関してはWSL上のUbuntuで動作検証を行っています。
+
+### Windowsの必須パッケージ
+
+- yt-dlp(このアプリには含まれていません)
+- ffmpeg(動画の処理)
+
+### macOSの必須パッケージ
+
+- yt-dlp(このアプリには含まれていません)
+- ffmpeg(動画の処理)
+
+### Linuxの必須パッケージ
+
+- yt-dlp(このアプリには含まれていません)
+- ffmpeg(動画の処理)
+- libmpvもしくはmpv(GUIの動作に必要)

@@ -34,7 +34,7 @@ def resolve_thumbnail(vid:str) -> str | None:
     ]
     for u in urls:
         try:
-            r = requests.head(u, timeout=3)
+            r = requests.head(u, timeout=1)
             if r.status_code == 200:
                 return u
         except Exception:
