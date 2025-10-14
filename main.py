@@ -1,15 +1,28 @@
-from textwrap import wrap
-from turtle import bgcolor
 from flet import *
 import subprocess
 import json
 import os
 import threading
 import requests
+import platform
 
 # ホームディレクトリ云々
 homedir = os.path.abspath(os.path.expanduser("~"))
 default_download_dir = os.path.join(homedir,"yt-dlp")
+
+# 開く
+def open_folder(path: str):
+    path = os.path.abspath(path)
+    system = platform.system()
+
+    if system == "Windows":
+        subprocess.Popen(["explorer", path])
+    elif system == "Darwin":
+        subprocess.Popen(["open", path])
+    elif system == "Linux":
+        subprocess.Popen(["xdg-open", path])
+    else:
+        pass
 
 # サムネイル
 def resolve_thumbnail(vid:str) -> str | None:
@@ -125,7 +138,7 @@ def main(page:Page):
         progress_template = "Downloading: %(progress._percent_str)s"
         cmd = ["yt-dlp", "--newline", "--no-warnings","--progress-template",progress_template]
         if use_cookies.value and from_cookies.value != "none":
-            cmd.append(f"--cookies-from-browser {from_cookies.value}")
+            cmd.extend(["--cookies-from-browser",from_cookies.value])
         if format_dropdown.value == "mp4" or format_dropdown.value == "mkv":
             if quality_dropdown.value == "auto":
                 cmd.extend(["-f","bestvideo[ext=mp4]+bestaudio[ext=m4a]/best","--merge-output-format",format_dropdown.value])
@@ -168,6 +181,13 @@ def main(page:Page):
                         log_text.controls.append(Text(log_entry))
                         log_text.scroll_to(-1)
                         log_text.update()
+            for line in p.stderr:
+                output = line.strip()
+                if output == "" and p.poll() is not None:
+                    break
+                if output:
+                    error_message = output.strip()
+                    log_text.controls.append(Text(f"⚠️ エラー : {error_message}",color=Colors.RED,weight=FontWeight.BOLD))
             p.wait()
             log_text.controls.append(Text(f"✅ ダウンロード完了 : {title}",weight=FontWeight.BOLD,color=Colors.GREEN))
             log_text.scroll_to(-1)
@@ -360,6 +380,11 @@ def main(page:Page):
             initial_directory=output_path_input.value
         )
     )
+    output_path_open = TextButton(
+        text="開く",
+        icon=Icons.FOLDER_OPEN,
+        on_click=lambda _:open_folder(output_path_input.value)
+    )
 
     # cookie
     use_cookies = Switch(
@@ -453,7 +478,7 @@ def main(page:Page):
     # 設定タブ
     setting_tab = Column(
         controls=[
-            Row([output_path_input,output_path_button]),
+            Row([output_path_input,output_path_button,output_path_open]),
             Row([format_dropdown,quality_dropdown]),
             Row([use_cookies,from_cookies])
         ],
