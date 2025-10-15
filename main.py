@@ -45,7 +45,11 @@ def resolve_thumbnail(vid:str) -> str | None:
 def get_video_info(url: str):
     cmd = ["yt-dlp","-J","--flat-playlist","--add-header","Accept-Language: ja-JP,ja;q=0.9,en-US;q=0.8,en;q=0.7",url]
     try:
-        result = subprocess.run(cmd,capture_output=True,text=True,check=True)
+        if platform.system() == "Windows":
+            result = subprocess.run(cmd,capture_output=True,text=True,check=True,creationflags=subprocess.CREATE_NO_WINDOW)
+        else:
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+
         data = json.loads(result.stdout)
 
         if "entries" in data:
@@ -70,7 +74,7 @@ def get_video_info(url: str):
         print("ERROR: ",e)
         return []
 
-def main(page:Page):
+def main(page:Page) -> None:
     page.title = "ytdl."
     page.scroll = ScrollMode.ADAPTIVE
     page.theme_mode = ThemeMode.LIGHT
@@ -163,7 +167,10 @@ def main(page:Page):
             log_text.controls.append(Text(f"▶️ ダウンロード開始 : {title}",weight=FontWeight.BOLD,color=Colors.BLUE))
             log_text.scroll_to(-1)
             toggle_download_button(True)
-            p = subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,bufsize=1,universal_newlines=True)
+            if platform.system() == 'Windows':
+                p = subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,bufsize=1,universal_newlines=True,creationflags=subprocess.CREATE_NO_WINDOW)
+            else:
+                p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1,universal_newlines=True)
             while True:
                 output = p.stdout.readline()
                 if output == "" and p.poll() is not None:
@@ -511,4 +518,5 @@ def main(page:Page):
         download_progress
     )
 
-app(target=main)
+if __name__ == '__main__':
+    app(target=main)
